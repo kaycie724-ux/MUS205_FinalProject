@@ -19,26 +19,29 @@ function setup() {
 
   amplitude = new p5.Amplitude();
 
-  // Instantiate sections
+  // Instantiate sections with direct sound references
   sections.push(new InstrumentSection({
     id: 'jazz1', name: 'Sax Corner', genre: 'Jazz',
     x: 60, y: 80, w: 260, h: 160,
     baseColor: '#2b3a67', activeColor: '#3f64a0',
-    buffer: jazzLoop
+    sound: jazzLoop   // 👈 direct sound file
   }));
+
   sections.push(new InstrumentSection({
     id: 'rock1', name: 'Amp Row', genre: 'Rock',
     x: 360, y: 80, w: 260, h: 160,
     baseColor: '#4b2e2e', activeColor: '#7a3f3f',
-    buffer: rockLoop
+    sound: rockLoop   // 👈 direct sound file
   }));
+
   sections.push(new InstrumentSection({
     id: 'edm1', name: 'Synth Table', genre: 'EDM',
     x: 660, y: 80, w: 260, h: 160,
     baseColor: '#1c3b2a', activeColor: '#2e7a59',
-    buffer: edmLoop
+    sound: edmLoop    // 👈 direct sound file
   }));
 }
+
 
 function draw() {
   background(18);
@@ -100,7 +103,6 @@ function drawUI() {
   text('Click sections to toggle loops. Space: play/pause • R: reset • M: mute', 20, height - 24);
 }
 
-// --- InstrumentSection class ---
 class InstrumentSection {
   constructor(cfg) {
     this.id = cfg.id;
@@ -112,20 +114,13 @@ class InstrumentSection {
     this.activeColor = color(cfg.activeColor);
     this.isActive = false;
 
-    // Audio
-    this.buffer = cfg.buffer;   // p5.SoundFile
-    this.gainNode = new p5.Gain();
-    this.gainNode.amp(0);       // start silent
+    // Directly store the p5.SoundFile
+    this.sound = cfg.sound;
 
-    // Route buffer through gainNode -> masterGain
-    this.buffer.disconnect();
-    this.buffer.connect(this.gainNode);
-    this.gainNode.connect(masterGain);
-
+    // Visual analyzers
     this.fft = new p5.FFT(0.8, 32);
     this.amp = new p5.Amplitude();
 
-    // Visual
     this.pulse = 0;
     this.equalizer = new Array(16).fill(0);
   }
@@ -144,19 +139,27 @@ class InstrumentSection {
   }
 
   start() {
+    if (getAudioContext().state !== 'running') {
+      getAudioContext().resume();
+    }
+
     if (!this.isActive) {
       this.isActive = true;
-      if (!this.buffer.isPlaying()) this.buffer.loop();
-      this.gainNode.amp(1.0, 0.4);   // smooth ramp up
-      this.amp.setInput(this.buffer);
-      this.fft.setInput(this.buffer);
+      // 🔊 Play the sound loop directly
+      if (!this.sound.isPlaying()) {
+        this.sound.loop();
+        console.log(this.name + " loop started");
+      }
+      this.amp.setInput(this.sound);
+      this.fft.setInput(this.sound);
     }
   }
 
   stop() {
     if (this.isActive) {
       this.isActive = false;
-      this.gainNode.amp(0.0, 0.4, () => this.buffer.stop());
+      this.sound.stop();
+      console.log(this.name + " stopped");
     }
   }
 
@@ -202,3 +205,4 @@ class InstrumentSection {
     pop();
   }
 }
+
