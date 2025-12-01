@@ -1,17 +1,22 @@
 let sections = [];
 let masterGain, amplitude;
 
+let jazzLoop, rockLoop, edmLoop;
+
 function preload() {
-  // Example: load audio files
-  this.jazzLoop = loadSound('assets/audio/jazz_loop.mp3');
-  this.rockLoop = loadSound('assets/audio/rock_loop.mp3');
-  this.edmLoop  = loadSound('assets/audio/edm_loop.mp3');
+  // Make sure these files are in the same folder as index.html
+  jazzLoop = loadSound('jazz_loop.mp3');
+  rockLoop = loadSound('rock_loop.mp3');
+  edmLoop  = loadSound('edm_loop.mp3');
 }
 
 function setup() {
   createCanvas(960, 540);
+
+  // Master gain controls overall volume
   masterGain = new p5.Gain();
   masterGain.amp(0.9);
+
   amplitude = new p5.Amplitude();
 
   // Instantiate sections
@@ -19,38 +24,40 @@ function setup() {
     id: 'jazz1', name: 'Sax Corner', genre: 'Jazz',
     x: 60, y: 80, w: 260, h: 160,
     baseColor: '#2b3a67', activeColor: '#3f64a0',
-    buffer: this.jazzLoop
+    buffer: jazzLoop
   }));
   sections.push(new InstrumentSection({
     id: 'rock1', name: 'Amp Row', genre: 'Rock',
     x: 360, y: 80, w: 260, h: 160,
     baseColor: '#4b2e2e', activeColor: '#7a3f3f',
-    buffer: this.rockLoop
+    buffer: rockLoop
   }));
   sections.push(new InstrumentSection({
     id: 'edm1', name: 'Synth Table', genre: 'EDM',
     x: 660, y: 80, w: 260, h: 160,
     baseColor: '#1c3b2a', activeColor: '#2e7a59',
-    buffer: this.edmLoop
+    buffer: edmLoop
   }));
 }
 
 function draw() {
   background(18);
-  // Ambient lights
   drawAmbient();
 
-  // Sections
   for (const s of sections) {
     s.update();
     s.draw();
   }
 
-  // UI labels
   drawUI();
 }
 
 function mousePressed() {
+  // Unlock audio context on first click
+  if (getAudioContext().state !== 'running') {
+    getAudioContext().resume();
+  }
+
   for (const s of sections) {
     if (s.contains(mouseX, mouseY)) {
       s.toggle();
@@ -60,15 +67,20 @@ function mousePressed() {
 }
 
 function keyPressed() {
-  if (key === ' ') { // Space: global pause/play (basic example)
+  if (key === ' ') {
     const anyPlaying = sections.some(s => s.isActive);
     if (anyPlaying) sections.forEach(s => s.stop());
     else sections.forEach(s => s.start());
   } else if (key === 'R') {
     sections.forEach(s => s.stop());
   } else if (key === 'M') {
-    // Mute master (example)
-    masterGain.amp(0.0, 0.3);
+    // Toggle mute/unmute
+    let currentAmp = masterGain.amp().value;
+    if (currentAmp > 0) {
+      masterGain.amp(0.0, 0.3);
+    } else {
+      masterGain.amp(0.9, 0.3);
+    }
   }
 }
 
@@ -88,9 +100,9 @@ function drawUI() {
   text('Click sections to toggle loops. Space: play/pause • R: reset • M: mute', 20, height - 24);
 }
 
-
+// --- InstrumentSection class ---
 class InstrumentSection {
-  constructor(cfg, audioCtx) {
+  constructor(cfg) {
     this.id = cfg.id;
     this.name = cfg.name;
     this.genre = cfg.genre;
@@ -101,10 +113,15 @@ class InstrumentSection {
     this.isActive = false;
 
     // Audio
-    this.buffer = cfg.buffer;            // loaded in preload
-    this.loop = new p5.SoundFile();      // or use p5.SoundFile directly if preloaded
+    this.buffer = cfg.buffer;   // p5.SoundFile
     this.gainNode = new p5.Gain();
-    this.gainNode.amp(0);                // start silent
+    this.gainNode.amp(0);       // start silent
+
+    // Route buffer through gainNode -> masterGain
+    this.buffer.disconnect();
+    this.buffer.connect(this.gainNode);
+    this.gainNode.connect(masterGain);
+
     this.fft = new p5.FFT(0.8, 32);
     this.amp = new p5.Amplitude();
 
@@ -129,23 +146,21 @@ class InstrumentSection {
   start() {
     if (!this.isActive) {
       this.isActive = true;
-      this.loop = this.buffer;       // if using preloaded p5.SoundFile
-      if (!this.loop.isPlaying()) this.loop.loop();
+      if (!this.buffer.isPlaying()) this.buffer.loop();
       this.gainNode.amp(1.0, 0.4);   // smooth ramp up
-      this.amp.setInput(this.loop);
-      this.fft.setInput(this.loop);
+      this.amp.setInput(this.buffer);
+      this.fft.setInput(this.buffer);
     }
   }
 
   stop() {
     if (this.isActive) {
       this.isActive = false;
-      this.gainNode.amp(0.0, 0.4, () => this.loop.stop());
+      this.gainNode.amp(0.0, 0.4, () => this.buffer.stop());
     }
   }
 
   update() {
-    // Audio-driven visual values
     const level = this.amp.getLevel();
     this.pulse = lerp(this.pulse, level, 0.2);
     const spectrum = this.fft.analyze();
@@ -158,20 +173,17 @@ class InstrumentSection {
     push();
     translate(this.pos.x, this.pos.y);
 
-    // Background panel
     const bg = this.isActive ? this.activeColor : this.color;
     const brightnessBoost = this.pulse * 80;
     fill(red(bg), green(bg), blue(bg) + brightnessBoost);
     rect(0, 0, this.size.x, this.size.y, 12);
 
-    // Title
     noStroke();
     fill(255);
     textSize(14);
     textAlign(LEFT, TOP);
     text(`${this.name} — ${this.genre}`, 10, 8);
 
-    // Equalizer bars
     const barW = (this.size.x - 20) / this.equalizer.length;
     for (let i = 0; i < this.equalizer.length; i++) {
       const h = map(this.equalizer[i], 0, 1, 4, this.size.y * 0.5);
@@ -180,7 +192,6 @@ class InstrumentSection {
       rect(x, this.size.y - 14 - h, barW - 2, h, 4);
     }
 
-    // Active glow
     if (this.isActive) {
       stroke(255, 220, 120, 160);
       strokeWeight(3);
@@ -191,4 +202,3 @@ class InstrumentSection {
     pop();
   }
 }
-
