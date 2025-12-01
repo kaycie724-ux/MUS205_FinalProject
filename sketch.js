@@ -4,7 +4,6 @@ let masterGain, amplitude;
 let jazzLoop, rockLoop, edmLoop;
 
 function preload() {
-  // Make sure these files are in the same folder as index.html
   jazzLoop = loadSound('jazz_loop.mp3');
   rockLoop = loadSound('rock_loop.mp3');
   edmLoop  = loadSound('edm_loop.mp3');
@@ -13,32 +12,30 @@ function preload() {
 function setup() {
   createCanvas(960, 540);
 
-  // Master gain controls overall volume
   masterGain = new p5.Gain();
   masterGain.amp(0.9);
 
   amplitude = new p5.Amplitude();
 
-  // Instantiate sections with direct sound references
   sections.push(new InstrumentSection({
     id: 'jazz1', name: 'Sax Corner', genre: 'Jazz',
     x: 60, y: 80, w: 260, h: 160,
     baseColor: '#2b3a67', activeColor: '#3f64a0',
-    sound: jazzLoop   // 👈 direct sound file
+    sound: jazzLoop   
   }));
 
   sections.push(new InstrumentSection({
     id: 'rock1', name: 'Amp Row', genre: 'Rock',
     x: 360, y: 80, w: 260, h: 160,
     baseColor: '#4b2e2e', activeColor: '#7a3f3f',
-    sound: rockLoop   // 👈 direct sound file
+    sound: rockLoop   
   }));
 
   sections.push(new InstrumentSection({
     id: 'edm1', name: 'Synth Table', genre: 'EDM',
     x: 660, y: 80, w: 260, h: 160,
     baseColor: '#1c3b2a', activeColor: '#2e7a59',
-    sound: edmLoop    // 👈 direct sound file
+    sound: edmLoop 
   }));
 }
 
@@ -56,7 +53,7 @@ function draw() {
 }
 
 function mousePressed() {
-  // Unlock audio context on first click
+ 
   if (getAudioContext().state !== 'running') {
     getAudioContext().resume();
   }
@@ -77,7 +74,7 @@ function keyPressed() {
   } else if (key === 'R') {
     sections.forEach(s => s.stop());
   } else if (key === 'M') {
-    // Toggle mute/unmute
+   
     let currentAmp = masterGain.amp().value;
     if (currentAmp > 0) {
       masterGain.amp(0.0, 0.3);
@@ -100,7 +97,7 @@ function drawAmbient() {
 function drawUI() {
   fill(220);
   textSize(12);
-  text('Click sections to toggle loops. Space: play/pause • R: reset • M: mute', 20, height - 24);
+  text('Click sections to toggle loops. Space: reset', 20, height - 24);
 }
 
 class InstrumentSection {
@@ -114,10 +111,10 @@ class InstrumentSection {
     this.activeColor = color(cfg.activeColor);
     this.isActive = false;
 
-    // Directly store the p5.SoundFile
+  
     this.sound = cfg.sound;
 
-    // Visual analyzers
+ 
     this.fft = new p5.FFT(0.8, 32);
     this.amp = new p5.Amplitude();
 
@@ -145,7 +142,7 @@ class InstrumentSection {
 
     if (!this.isActive) {
       this.isActive = true;
-      // 🔊 Play the sound loop directly
+     
       if (!this.sound.isPlaying()) {
         this.sound.loop();
         console.log(this.name + " loop started");
